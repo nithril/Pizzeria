@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <parent>
+    <artifactId>vbackbone-distribution-email-parent</artifactId>
+    <groupId>com.victorbuckservices.vbackbone.service.distribution.email</groupId>
+    <version>1.3.1-SNAPSHOT</version>
+  </parent>
+  <modelVersion>4.0.0</modelVersion>
+
+  <artifactId>vbackbone-distribution-email-dao</artifactId>
+
+  <properties>
+    <vbackbone.service>vbackbone-distribution-email-dbupgrader</vbackbone.service>
+  </properties>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>3.0.2</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>test-jar</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <plugin>
+        <groupId>org.liquibase</groupId>
+        <artifactId>liquibase-maven-plugin</artifactId>
+        <version>${liquibase.version}</version>
+        <configuration>
+          <driver>oracle.jdbc.OracleDriver</driver>
+          <url>${database.url}</url>
+          <username>${database.superuser.username}</username>
+          <password>${database.superuser.password}</password>
+          <changeLogFile>${changeLogFile}</changeLogFile>
+          <defaultSchemaName>${database.store.username}</defaultSchemaName>
+          <schemas>${database.store.username}</schemas>
+          <promptOnNonLocalDatabase>false</promptOnNonLocalDatabase>
+          <expressionVars>
+            <property>
+              <name>TABLESPACE_PREFIX</name>
+              <value>${database.store.username}_</value>
+            </property>
+            <property>
+              <name>DB_STORE</name>
+              <value>${database.store.username}</value>
+            </property>
+            <property>
+              <name>DB_USER</name>
+              <value>${database.user.username}</value>
+            </property>
+            <property>
+              <name>VSAFE_DB_STORE</name>
+              <value>${database.vsafe.store.username}</value>
+            </property>
+          </expressionVars>
+        </configuration>
+      </plugin>
+
+
+
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>dbunit-maven-plugin</artifactId>
+        <version>1.0-beta-3</version>
+
+        <dependencies>
+          <dependency>
+            <groupId>com.oracle</groupId>
+            <artifactId>ojdbc6</artifactId>
+            <version>${jdbc.driver.version}</version>
+          </dependency>
+          <dependency>
+            <groupId>org.dbunit</groupId>
+            <artifactId>dbunit</artifactId>
+            <version>2.5.2</version>
+          </dependency>
+        </dependencies>
+        <configuration>
+          <driver>oracle.jdbc.OracleDriver</driver>
+          <url>${database.url}</url>
+          <type>CLEAN_INSERT</type>
+          <dataTypeFactoryName>org.dbunit.ext.oracle.Oracle10DataTypeFactory</dataTypeFactoryName>
+          <username>${database.store.username}</username>
+          <password>${database.store.password}</password>
+          <src>${project.basedir}/src/test/resources/db/vemail.full.xml</src>
+          <format>flat</format>
+          <schema>${database.store.username}</schema>
+        </configuration>
+      </plugin>
+
+<!--
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>enforce-database-username</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <requireProperty>
+                  <property>database.store.username</property>
+                  <message>"The target database must always be a development database. Therefore the database.owner.username property
+                    must start with a D"
+                  </message>
+                  <regex>(^$|^D.*$)</regex>
+                  <regexMessage>"The target database must always be a development database. Therefore the database.owner.username
+                    property must start with a D"
+                  </regexMessage>
+                </requireProperty>
+
+              </rules>
+              <fail>true</fail>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>-->
+    </plugins>
+  </build>
+
+  <profiles>
+    <profile>
+      <id>packaging</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>appassembler-maven-plugin</artifactId>
+            <version>1.10</version>
+            <executions>
+              <execution>
+                <id>generate-console</id>
+                <goals>
+                  <goal>assemble</goal>
+                </goals>
+                <phase>package</phase>
+                <configuration>
+                  <assembleDirectory>${project.build.directory}/console</assembleDirectory>
+                  <repositoryLayout>flat</repositoryLayout>
+                  <repositoryName>lib</repositoryName>
+                  <useWildcardClassPath>true</useWildcardClassPath>
+                  <extraJvmArguments>-Djava.security.egd=file:///dev/urandom</extraJvmArguments>
+                  <programs>
+                    <program>
+                      <mainClass>liquibase.integration.commandline.Main</mainClass>
+                      <id>liquibase</id>
+                      <platforms>
+                        <platform>windows</platform>
+                        <platform>unix</platform>
+                      </platforms>
+                    </program>
+                  </programs>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+
+          <plugin>
+            <artifactId>maven-antrun-plugin</artifactId>
+            <version>1.7</version>
+            <executions>
+              <execution>
+                <phase>package</phase>
+                <configuration>
+                  <target>
+                    <mkdir dir="${project.build.directory}/rpm/usr/share/${vbackbone.service}"/>
+                    <mkdir dir="${project.build.directory}/rpm/etc/${vbackbone.service}"/>
+
+                    <copy todir="${project.build.directory}/rpm/usr/share/${vbackbone.service}">
+                      <fileset dir="${project.build.directory}/console"/>
+                    </copy>
+
+                    <copy file="${project.basedir}/src/main/liquibase/liquibase.properties"
+                          todir="${project.build.directory}/rpm/etc/${vbackbone.service}/"/>
+
+                    <zip destfile="${project.build.directory}/${vbackbone.service}-console.zip"
+                         basedir="${project.build.directory}/console/"/>
+                  </target>
+                </configuration>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+
+    <profile>
+      <id>querydsl-sql</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>com.querydsl</groupId>
+            <artifactId>querydsl-maven-plugin</artifactId>
+            <version>4.1.3</version>
+            <executions>
+              <execution>
+                <goals>
+                  <goal>export</goal>
+                </goals>
+              </execution>
+            </executions>
+            <configuration>
+              <jdbcDriver>oracle.jdbc.OracleDriver</jdbcDriver>
+              <jdbcUrl>${database.url}</jdbcUrl>
+              <jdbcUser>${database.store.username}</jdbcUser>
+              <jdbcPassword>${database.store.password}</jdbcPassword>
+              <schemaPattern>${database.store.username}</schemaPattern>
+              <packageName>com.myproject.domain</packageName>
+              <namePrefix>S</namePrefix>
+              <exportForeignKeys>false</exportForeignKeys>
+              <targetFolder>${project.basedir}/target/generated-sources/java</targetFolder>
+              <packageName>com.victorbuckservices.vbackbone.service.distribution.email.dom</packageName>
+            </configuration>
+            <dependencies>
+              <dependency>
+                <groupId>com.oracle</groupId>
+                <artifactId>ojdbc6</artifactId>
+                <version>${jdbc.driver.version}</version>
+              </dependency>
+            </dependencies>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.oracle</groupId>
+      <artifactId>ojdbc6</artifactId>
+      <version>${jdbc.driver.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.liquibase</groupId>
+      <artifactId>liquibase-core</artifactId>
+      <version>${liquibase.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>com.victorbuckservices.vbackbone.common.correlationstore</groupId>
+      <artifactId>request-reply-correlation-store</artifactId>
+      <version>${request-reply-correlation-store.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>com.victorbuckservices.common.quartz</groupId>
+      <artifactId>quartz-liquibase</artifactId>
+      <version>${quartz-liquibase.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>com.victorbuckservices.vsafe</groupId>
+      <artifactId>vsafe-client-liquibase</artifactId>
+      <version>${vsafe.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>com.querydsl</groupId>
+      <artifactId>querydsl-sql</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>com.querydsl</groupId>
+      <artifactId>querydsl-sql-codegen</artifactId>
+      <scope>provided</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>com.victorbuckservices.vsafe</groupId>
+      <artifactId>vsafe-dom</artifactId>
+      <version>${vsafe.version}</version>
+    </dependency>
+
+
+
+  </dependencies>
+</project>
